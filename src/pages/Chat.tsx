@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteChatModal } from "@/components/chat/DeleteChatModal";
 import { Input } from "@/components/ui/input";
 import { streamQuery } from "@/services/api/query";
-import { useDocuments, useSiteKeys } from "@/hooks/useDocuments";
+import { useSiteKeys } from "@/hooks/useDocuments";
 import {
   useCreateSession,
   useDeleteSession,
@@ -48,7 +48,6 @@ export function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const qc = useQueryClient();
-  const { data: docsData } = useDocuments({ page: 1, limit: 200 });
   const { data: siteKeys = [] } = useSiteKeys();
   const sessionsQuery = useSessionsList({ page: 1, limit: 50 });
   const selectedSessionId = activeSessionId ?? sessionsQuery.data?.sessions?.[0]?.id ?? null;
@@ -59,9 +58,6 @@ export function Chat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [threadQuery.data, optimisticTurn]);
-
-  const documents = docsData?.documents ?? [];
-  const indexedDocs = documents.filter((d) => d.status === "INDEXED");
 
   function parseScope(value: string): { documentId?: string; siteKey?: string } {
     if (value.startsWith("site:")) return { siteKey: value.slice(5) };
@@ -289,14 +285,11 @@ export function Chat() {
                   onChange={(e) => setScope(e.target.value)}
                   className="appearance-none h-8 pl-8 pr-10 rounded-full border border-border/50 bg-background/50 text-[11px] font-medium hover:border-primary/50 transition-all focus:ring-0 cursor-pointer"
                 >
-                  <option value={SCOPE_ALL}>All knowledge</option>
-                  {(indexedDocs.length > 0 || siteKeys.length > 0) && (
+                  <option value={SCOPE_ALL}>Select Source</option>
+                  {siteKeys.length > 0 && (
                     <>
                       {siteKeys.map((sk) => (
                         <option key={sk} value={`site:${sk}`}>Site: {tryShortLabel(sk)}</option>
-                      ))}
-                      {indexedDocs.map((d) => (
-                        <option key={d.id} value={`doc:${d.id}`}>Doc: {d.title || tryShortLabel(d.url)}</option>
                       ))}
                     </>
                   )}
