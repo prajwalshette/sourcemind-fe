@@ -10,6 +10,8 @@ import {
 } from "@/hooks/useDocuments"
 import type { Document } from "@/types/document"
 import { ChevronRight, ChevronDown } from "lucide-react"
+import Pagination from "@/components/common/Pagination"
+
 
 function ChildDocumentsList({
   siteKey,
@@ -226,11 +228,14 @@ export function Documents() {
   const [maxPages, setMaxPages] = useState<number>(50)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const { data, isLoading } = useDocuments({
-    page: 1,
-    limit: 50,
+    page,
+    limit,
     rootOnly: true,
   })
+
   const ingest = useIngestDocument()
   const remove = useDeleteDocument()
   const reindex = useReindexDocument()
@@ -392,9 +397,7 @@ export function Documents() {
                   className="h-9 w-24 rounded-lg border border-input bg-transparent px-3 text-sm disabled:opacity-50"
                 />
               </label>
-              <span className="text-muted-foreground">
-                Uses Crawl4AI Tier 1 (fallback Firecrawl).
-              </span>
+
             </div>
           </form>
         </CardContent>
@@ -479,7 +482,7 @@ export function Documents() {
                           <tr className="border-b border-border bg-muted/20">
                             <td colSpan={6} className="p-0">
                               <ChildDocumentsList
-                                siteKey={doc.url}
+                                siteKey={doc.siteKey ?? doc.url}
                                 onDelete={handleDelete}
                                 onReindex={handleReindex}
                                 isDeleting={remove.isPending}
@@ -493,7 +496,23 @@ export function Documents() {
                   </tbody>
                 </table>
               </div>
+              {pagination && (
+                <div className="mt-4 border-t border-border/50 pt-4">
+                  <Pagination
+                    currentPage={page}
+                    totalPages={pagination.pages}
+                    pageSize={limit}
+                    totalCount={pagination.total}
+                    onPageChange={setPage}
+                    onPageSizeChange={(newLimit) => {
+                      setLimit(newLimit)
+                      setPage(1) // Reset to first page when limit changes
+                    }}
+                  />
+                </div>
+              )}
             </div>
+
           )}
         </CardContent>
       </Card>

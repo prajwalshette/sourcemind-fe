@@ -23,6 +23,18 @@ export function useDocuments(params: ListDocumentsParams = {}) {
       const res = await listDocuments(params);
       return { documents: res.data, pagination: res.pagination };
     },
+    // Prevent accidental request storms in dev (StrictMode double-invokes,
+    // window-focus refetch, retries on 429, etc.)
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, err: unknown) => {
+      const status =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 429) return false;
+      return failureCount < 2;
+    },
   });
 }
 
@@ -32,6 +44,16 @@ export function useSiteKeys() {
     queryFn: async () => {
       const list = await getSiteKeys();
       return Array.isArray(list) ? list : [];
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, err: unknown) => {
+      const status =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 429) return false;
+      return failureCount < 2;
     },
   });
 }

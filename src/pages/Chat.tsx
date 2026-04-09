@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteChatModal } from "@/components/chat/DeleteChatModal";
+import { SourceSelectorDropdown } from "@/components/chat/SourceSelectorDropdown";
 import { Input } from "@/components/ui/input";
 import { streamQuery } from "@/services/api/query";
 import { useSiteKeys } from "@/hooks/useDocuments";
@@ -11,16 +12,14 @@ import {
   useSessionThread,
 } from "@/hooks/useSessions";
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  Plus, 
-  MessageSquare, 
-  Trash2, 
-  Send, 
-  Zap, 
-  Globe, 
-  Clock, 
-  Search,
-  ChevronDown
+import {
+  Plus,
+  MessageSquare,
+  Trash2,
+  Send,
+  Zap,
+  Globe,
+  Clock,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -33,7 +32,7 @@ const SCOPE_ALL = "";
 export function Chat() {
   const [question, setQuestion] = useState("");
   const [scope, setScope] = useState<string>(SCOPE_ALL);
-  const [skipIntelligence, setSkipIntelligence] = useState(false);
+  const [skipIntelligence] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [optimisticTurn, setOptimisticTurn] = useState<null | {
     question: string;
@@ -208,21 +207,26 @@ export function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100svh-8rem)] -m-6 lg:-m-8">
+    <div className="flex flex-col h-[calc(100svh-4rem)] -m-6 lg:-m-8">
+
       {/* Container for Sidebar and Main Chat */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         
         {/* Sessions Sub-Sidebar */}
         <aside className="hidden lg:flex flex-col w-80 border-r border-border/50 bg-card/30 backdrop-blur-sm">
-          <div className="p-6 border-b border-border/50">
+          <div className="p-5 border-b border-border/40">
             <Button
-              className="w-full justify-start gap-2 shadow-lg shadow-primary/10"
+              className="w-full h-11 justify-start gap-3 rounded-xl font-bold bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all group"
               onClick={handleNewChat}
               disabled={createSessionMutation.isPending}
             >
-              <Plus className="h-4 w-4" /> New conversation
+              <div className="flex items-center justify-center h-6 w-6 rounded-lg bg-primary-foreground/15 border border-primary-foreground/10 group-hover:bg-primary-foreground/25 transition-colors">
+                <Plus className="h-4 w-4" />
+              </div>
+              <span>New conversation</span>
             </Button>
           </div>
+
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {sessionsQuery.isLoading ? (
@@ -279,39 +283,17 @@ export function Chat() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <select
-                  value={scope}
-                  onChange={(e) => setScope(e.target.value)}
-                  className="appearance-none h-8 pl-8 pr-10 rounded-full border border-border/50 bg-background/50 text-[11px] font-medium hover:border-primary/50 transition-all focus:ring-0 cursor-pointer"
-                >
-                  <option value={SCOPE_ALL}>Select Source</option>
-                  {siteKeys.length > 0 && (
-                    <>
-                      {siteKeys.map((sk) => (
-                        <option key={sk} value={`site:${sk}`}>Site: {tryShortLabel(sk)}</option>
-                      ))}
-                    </>
-                  )}
-                </select>
-                <Search className="absolute left-2.5 top-2.5 h-3 w-3 text-muted-foreground pointer-events-none" />
-                <ChevronDown className="absolute right-2.5 top-2.5 h-3 w-3 text-muted-foreground pointer-events-none" />
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-8 w-8 rounded-full", skipIntelligence ? "text-amber-500 bg-amber-500/10" : "text-primary bg-primary/10")}
-                onClick={() => setSkipIntelligence(!skipIntelligence)}
-                title={skipIntelligence ? "Intelligence: OFF (Faster)" : "Intelligence: ON (Smarter)"}
-              >
-                <Zap className="h-4 w-4" />
-              </Button>
+              <SourceSelectorDropdown
+                scope={scope}
+                siteKeys={siteKeys}
+                onSelect={setScope}
+                tryShortLabel={tryShortLabel}
+              />
             </div>
           </header>
 
           {/* Conversation History */}
-          <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8 min-h-0 scroll-smooth">
+          <div className="flex-1 overflow-y-auto px-4 py-3 lg:px-8 lg:py-5 space-y-6 min-h-0 scroll-smooth">
             {!selectedSessionId ? (
               <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
                 <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center border border-primary/10">
@@ -323,9 +305,18 @@ export function Chat() {
                     Pick an existing session or start a new one to ask questions across your indexed knowledge.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleNewChat} className="rounded-full px-6">
-                  <Plus className="mr-2 h-4 w-4" /> Create New Chat
+                <Button 
+                  variant="default" 
+                  size="default" 
+                  onClick={handleNewChat} 
+                  className="rounded-xl px-8 font-bold h-11 gap-2 shadow-xl shadow-primary/10 hover:scale-105 active:scale-95 transition-all"
+                >
+                  <div className="flex items-center justify-center h-5 w-5 rounded-md bg-primary-foreground/15">
+                    <Plus className="h-3.5 w-3.5" />
+                  </div>
+                  Create New Chat
                 </Button>
+
               </div>
             ) : threadQuery.isLoading ? (
               <div className="space-y-6">
@@ -430,7 +421,8 @@ export function Chat() {
           </div>
 
           {/* Input Area */}
-          <footer className="p-4 lg:p-8 pt-0 bg-transparent z-10">
+          <footer className="px-4 pb-2 pt-0 lg:px-8 lg:pb-4 bg-transparent z-10">
+
             <div className="max-w-4xl mx-auto relative">
                <div className="absolute -inset-2 bg-gradient-to-r from-primary/5 to-blue-500/5 rounded-[2rem] blur-xl -z-10" />
                <form 
@@ -464,7 +456,7 @@ export function Chat() {
                     )}
                   </Button>
                </form>
-               <p className="mt-3 text-[10px] text-center text-muted-foreground font-medium">
+               <p className="mt-2 text-[10px] text-center text-muted-foreground font-medium">
                   SourceMind AI may provide inaccurate info about people, places, or facts. Verified with RAG confidence.
                </p>
             </div>
@@ -512,3 +504,4 @@ function MarkdownText({ content }: { content: string }) {
     </div>
   );
 }
+
