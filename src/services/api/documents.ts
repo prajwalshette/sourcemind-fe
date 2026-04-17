@@ -11,7 +11,18 @@ export async function ingestUrl(body: IngestBody) {
   const { data } = await serverInstance.post<
     | { success: true; data: IngestResponse; message?: string }
     | { success: true; message: string; data: { documentId: string; status: string } }
-  >("/documents/ingest", body);
+  >("/documents/ingest-website", body);
+  return data;
+}
+
+export async function ingestFiles(formData: FormData) {
+  const { data } = await serverInstance.post<{
+    success: true;
+    message: string;
+    data: { ids: string[] };
+  }>("/documents/ingest-files", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return data;
 }
 
@@ -24,9 +35,19 @@ export async function listDocuments(params: ListDocumentsParams = {}) {
   return data;
 }
 
-export async function getSiteKeys(): Promise<string[]> {
-  const { data } = await serverInstance.get<{ success: true; data: string[] }>(
-    "/documents/site-keys"
+export type SourceListItem = {
+  key: string;
+  sourceType: "WEBSITE" | "FILE" | "GITHUB";
+  title?: string | null;
+  fileType?: string | null;
+};
+
+export async function getSources(): Promise<SourceListItem[]> {
+  const { data } = await serverInstance.get<{
+    success: true;
+    data: SourceListItem[];
+  }>(
+    "/documents/sources"
   );
   return data?.data ?? [];
 }

@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import { AddSourceModal } from "@/components/common/AddSourceModal";
 import { 
   Globe, 
   FileText, 
@@ -23,6 +25,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 export function Dashboard() {
   const user = getStoredUser();
   const { data, isLoading } = useDashboardStats();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   const stats = [
     { 
@@ -88,9 +91,9 @@ export function Dashboard() {
               Your semantic knowledge base is synced and ready. Process new sites or interrogate your current dataset with natural language.
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
-              <Link to="/dashboard/documents" className={cn(buttonVariants({ size: "lg" }), "rounded-2xl px-10 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-transform")}>
-                <PlusCircle className="mr-2 h-5 w-5" /> Ingest New URL
-              </Link>
+              <button onClick={() => setIsModalOpen(true)} className={cn(buttonVariants({ size: "lg" }), "cursor-pointer rounded-2xl px-10 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-transform")}>
+                <PlusCircle className="mr-2 h-5 w-5" /> Add Source
+              </button>
               <Link to="/dashboard/chat" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-2xl px-10 bg-background/50 backdrop-blur-sm hover:bg-background/80 hover:scale-[1.02] transition-transform")}>
                 <MessageSquare className="mr-2 h-5 w-5" /> Start Reasoning
               </Link>
@@ -187,7 +190,7 @@ export function Dashboard() {
               <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" /> Recently Ingested
               </h3>
-              <Link to="/dashboard/documents" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 uppercase tracking-wider">
+              <Link to="/dashboard/sources" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 uppercase tracking-wider">
                 Browse Repository <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
@@ -231,7 +234,7 @@ export function Dashboard() {
                         {doc.status}
                       </span>
                       <Link 
-                        to={`/dashboard/documents/${doc.id}`} 
+                        to="/dashboard/sources"
                         className="text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 uppercase"
                       >
                         Inspect <ArrowRight className="h-2 w-2" />
@@ -248,9 +251,9 @@ export function Dashboard() {
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto mb-6">
                     Connect your first URL to begin building your semantic knowledge base.
                   </p>
-                  <Link to="/dashboard/documents" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl")}>
+                  <button onClick={() => setIsModalOpen(true)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl cursor-pointer")}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Source
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -340,13 +343,15 @@ export function Dashboard() {
               <MousePointerClick className="h-8 w-8 opacity-80" />
               <h4 className="text-xl font-bold leading-tight">Ready to expand your intelligence?</h4>
               <p className="text-sm text-white/80 leading-relaxed uppercase tracking-tighter font-medium">Add a new site to your database in seconds.</p>
-              <Link to="/dashboard/documents" className="flex items-center justify-center w-full py-3 bg-white text-primary rounded-xl font-bold text-sm hover:bg-white/90 transition-colors shadow-lg">
+              <button disabled={isLoading} onClick={() => setIsModalOpen(true)} className="flex items-center justify-center w-full py-3 bg-white text-primary rounded-xl font-bold text-sm hover:cursor-pointer hover:bg-white/90 transition-colors shadow-lg">
                 Quick Ingest
-              </Link>
+              </button>
             </div>
           </div>
         </div>
       </div>
+      
+      <AddSourceModal open={isModalOpen} onOpenChange={setIsModalOpen} />
     </div>
   );
 }

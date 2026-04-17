@@ -6,7 +6,7 @@ import { Home } from "@/pages/Home";
 import { Login } from "@/pages/Login";
 import { Register } from "@/pages/Register";
 import { Dashboard } from "@/pages/Dashboard";
-import { Documents } from "@/pages/Documents";
+import { Sources } from "@/pages/Sources";
 import { Chat } from "@/pages/Chat";
 
 export function App() {
@@ -39,7 +39,8 @@ export function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="documents" element={<Documents />} />
+          <Route path="sources" element={<Sources />} />
+          <Route path="documents" element={<Navigate to="/dashboard/sources" replace />} />
           <Route path="chat" element={<Chat />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

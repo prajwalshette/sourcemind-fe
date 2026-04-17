@@ -1,17 +1,15 @@
 import { useState, useCallback, useRef, useEffect, Fragment } from "react"
+import { AddSourceModal } from "@/components/common/AddSourceModal"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   useDocuments,
-  useIngestDocument,
   useDeleteDocument,
   useReindexDocument,
 } from "@/hooks/useDocuments"
 import type { Document } from "@/types/document"
-import { ChevronRight, ChevronDown } from "lucide-react"
+import { ChevronRight, ChevronDown, PlusCircle } from "lucide-react"
 import Pagination from "@/components/common/Pagination"
-
 
 function ChildDocumentsList({
   siteKey,
@@ -45,7 +43,7 @@ function ChildDocumentsList({
   return (
     <div className="m-3 mb-6 ml-12 rounded-lg border border-border/50 bg-muted/40 shadow-inner">
       <div className="flex items-center justify-between border-b border-border/50 bg-muted/60 p-2 px-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-        <span>Crawled Sub-pages</span>
+        <span>Crawled sub-pages</span>
         <span className="rounded-full border bg-background px-2 py-0.5">
           {documents.length} pages
         </span>
@@ -222,10 +220,8 @@ function DocumentRow({
   )
 }
 
-export function Documents() {
-  const [url, setUrl] = useState("")
-  const [crawlAllPages, setCrawlAllPages] = useState(false)
-  const [maxPages, setMaxPages] = useState<number>(50)
+export function Sources() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
@@ -236,7 +232,6 @@ export function Documents() {
     rootOnly: true,
   })
 
-  const ingest = useIngestDocument()
   const remove = useDeleteDocument()
   const reindex = useReindexDocument()
 
@@ -271,30 +266,8 @@ export function Documents() {
     })
   }, [])
 
-  const handleIngest = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!url.trim()) return
-    try {
-      await ingest.mutateAsync({
-        url: url.trim(),
-        async: true,
-        crawlAllPages: crawlAllPages || undefined,
-        maxPages: crawlAllPages ? maxPages : undefined,
-      })
-      setUrl("")
-      alert("Ingestion started. Document will be processed in the background.")
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { message?: string } } }).response
-              ?.data?.message
-          : "Ingest failed"
-      alert(message ?? "Ingest failed")
-    }
-  }
-
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this document?")) return
+    if (!confirm("Delete this source?")) return
     try {
       await remove.mutateAsync(id)
       setSelectedIds((prev) => {
@@ -310,7 +283,7 @@ export function Documents() {
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
-    if (!confirm(`Delete ${ids.length} selected document(s)?`)) return
+    if (!confirm(`Delete ${ids.length} selected source(s)?`)) return
     try {
       for (const id of ids) {
         await remove.mutateAsync(id)
@@ -346,66 +319,34 @@ export function Documents() {
     <div className="space-y-10">
       <div className="space-y-2">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
-          Documents
+          Sources
         </h1>
         <p className="max-w-2xl text-lg text-muted-foreground">
-          Ingest URLs to index their content for RAG queries.
+          Connect websites or upload files to build your RAG knowledge base.
         </p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Add URL</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Enter a URL to ingest. Processing runs in the background.
-          </p>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Add source</CardTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Ingest a website or upload documents.
+            </p>
+          </div>
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-xl shadow-md gap-2"
+            size="lg"
+          >
+            <PlusCircle className="h-5 w-5" /> Add Source
+          </Button>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleIngest} className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                type="url"
-                placeholder="https://example.com/page"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="submit" disabled={ingest.isPending}>
-                {ingest.isPending ? "Adding…" : "Ingest"}
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={crawlAllPages}
-                  onChange={(e) => setCrawlAllPages(e.target.checked)}
-                />
-                <span>Crawl whole site</span>
-              </label>
-
-              <label className="flex items-center gap-2">
-                <span className="text-muted-foreground">Max pages</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={200}
-                  value={maxPages}
-                  disabled={!crawlAllPages}
-                  onChange={(e) => setMaxPages(Number(e.target.value))}
-                  className="h-9 w-24 rounded-lg border border-input bg-transparent px-3 text-sm disabled:opacity-50"
-                />
-              </label>
-
-            </div>
-          </form>
-        </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Indexed documents</CardTitle>
+          <CardTitle>Indexed sources</CardTitle>
           {pagination && (
             <p className="text-sm text-muted-foreground">
               {pagination.total} total
@@ -417,7 +358,7 @@ export function Documents() {
             <p className="text-muted-foreground">Loading…</p>
           ) : documents.length === 0 ? (
             <p className="text-muted-foreground">
-              No documents yet. Add a URL above.
+              No sources yet. Add a URL or upload a file above.
             </p>
           ) : (
             <div className="space-y-3">
@@ -457,7 +398,7 @@ export function Documents() {
                           className="h-4 w-4 rounded border-input"
                         />
                       </th>
-                      <th className="p-3">URL</th>
+                      <th className="p-3">Source URL</th>
                       <th className="p-3">Title</th>
                       <th className="p-3">Status</th>
                       <th className="p-3">Chunks / Tokens</th>
@@ -506,16 +447,18 @@ export function Documents() {
                     onPageChange={setPage}
                     onPageSizeChange={(newLimit) => {
                       setLimit(newLimit)
-                      setPage(1) // Reset to first page when limit changes
+                      setPage(1)
                     }}
                   />
                 </div>
               )}
             </div>
-
           )}
         </CardContent>
       </Card>
+
+      <AddSourceModal open={isModalOpen} onOpenChange={setIsModalOpen} />
     </div>
   )
 }
+

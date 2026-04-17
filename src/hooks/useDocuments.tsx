@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listDocuments,
-  getSiteKeys,
+  getSources,
   ingestUrl,
+  ingestFiles,
   getDocumentById,
   deleteDocument,
   reindexDocument,
@@ -38,11 +39,11 @@ export function useDocuments(params: ListDocumentsParams = {}) {
   });
 }
 
-export function useSiteKeys() {
+export function useSources() {
   return useQuery({
-    queryKey: ["siteKeys"],
+    queryKey: ["sources"],
     queryFn: async () => {
-      const list = await getSiteKeys();
+      const list = await getSources();
       return Array.isArray(list) ? list : [];
     },
     staleTime: 60_000,
@@ -74,6 +75,16 @@ export function useIngestDocument() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ingestUrl,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+}
+
+export function useIngestFiles() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ingestFiles,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },

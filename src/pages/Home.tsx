@@ -19,7 +19,7 @@ export function Home() {
       title: "Documents",
       description: "Upload and analyze PDFs, Word docs, and plain text files with ease.",
       icon: <FileText className="w-6 h-6 text-amber-500" />,
-      comingSoon: true
+      comingSoon: false
     },
     {
       title: "YouTube Videos",

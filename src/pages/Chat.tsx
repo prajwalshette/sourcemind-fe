@@ -4,7 +4,7 @@ import { DeleteChatModal } from "@/components/chat/DeleteChatModal";
 import { SourceSelectorDropdown } from "@/components/chat/SourceSelectorDropdown";
 import { Input } from "@/components/ui/input";
 import { streamQuery } from "@/services/api/query";
-import { useSiteKeys } from "@/hooks/useDocuments";
+import { useSources } from "@/hooks/useDocuments";
 import {
   useCreateSession,
   useDeleteSession,
@@ -19,6 +19,7 @@ import {
   Send,
   Zap,
   Globe,
+  FileText,
   Clock,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -47,7 +48,7 @@ export function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const qc = useQueryClient();
-  const { data: siteKeys = [] } = useSiteKeys();
+  const { data: sources = [] } = useSources();
   const sessionsQuery = useSessionsList({ page: 1, limit: 50 });
   const selectedSessionId = activeSessionId ?? sessionsQuery.data?.sessions?.[0]?.id ?? null;
   const threadQuery = useSessionThread(selectedSessionId);
@@ -120,9 +121,14 @@ export function Chat() {
         qc.invalidateQueries({ queryKey: ["sessionThread", sessionId] }),
       ]);
     } catch (err: unknown) {
-      const message = err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-        : "Query failed";
+      const message =
+        err instanceof Error
+          ? err.message
+          : err && typeof err === "object" && "response" in err
+            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            : err && typeof err === "object" && "message" in err
+              ? String((err as { message?: unknown }).message ?? "Query failed")
+              : "Query failed";
       setOptimisticTurn({
         question: q,
         answer: `Error: ${message ?? "Query failed"}`,
@@ -285,7 +291,7 @@ export function Chat() {
             <div className="flex items-center gap-2">
               <SourceSelectorDropdown
                 scope={scope}
-                siteKeys={siteKeys}
+                sources={sources}
                 onSelect={setScope}
                 tryShortLabel={tryShortLabel}
               />
@@ -387,9 +393,13 @@ export function Chat() {
                                   className="group flex flex-col p-2 rounded-xl bg-background/40 border border-border/30 hover:border-primary/40 transition-all"
                                 >
                                   <div className="flex items-center gap-2 mb-1">
-                                    <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
+                                    {isFileSource(s.url) ? (
+                                      <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+                                    ) : (
+                                      <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
+                                    )}
                                     <span className="text-[10px] font-semibold truncate group-hover:text-primary transition-colors">
-                                      {new URL(s.url).hostname}
+                                      {isFileSource(s.url) ? shortFileId(s.url) : new URL(s.url).hostname}
                                     </span>
                                   </div>
                                   <p className="text-[9px] text-muted-foreground truncate opacity-60">
@@ -503,5 +513,15 @@ function MarkdownText({ content }: { content: string }) {
       </ReactMarkdown>
     </div>
   );
+}
+
+function isFileSource(url: string) {
+  return url.startsWith("file://");
+}
+
+function shortFileId(url: string) {
+  const raw = url.replace(/^file:\/\//, "");
+  const head = raw.slice(0, 18);
+  return raw.length > 18 ? `${head}…` : head;
 }
 

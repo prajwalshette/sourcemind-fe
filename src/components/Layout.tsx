@@ -14,7 +14,7 @@ export function Layout() {
 
   const navItems = [
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { label: "Documents", path: "/dashboard/documents", icon: FileText },
+    { label: "Sources", path: "/dashboard/sources", icon: FileText },
     { label: "AI Chat", path: "/dashboard/chat", icon: MessageSquare },
   ];
 
