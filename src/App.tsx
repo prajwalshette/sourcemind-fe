@@ -8,12 +8,14 @@ import { Register } from "@/pages/Register";
 import { Dashboard } from "@/pages/Dashboard";
 import { Sources } from "@/pages/Sources";
 import { Chat } from "@/pages/Chat";
+import { Architecture } from "@/pages/Architecture";
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/architecture" element={<Architecture />} />
         <Route
           path="/login"
           element={

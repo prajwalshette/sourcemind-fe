@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { getStoredToken, useLogout } from "@/hooks/useAuth";
 import { Globe, FileText, Youtube, Github, ArrowRight, Network, Zap, Shield } from "lucide-react";
+import { TwoPaneProductDemo } from "@/components/home/TwoPaneProductDemo";
 
 export function Home() {
   const isLoggedIn = !!getStoredToken();
@@ -36,15 +37,21 @@ export function Home() {
   ];
 
   return (
-    <div className="flex flex-col min-h-svh bg-background">
+    <div className="flex flex-col min-h-svh bg-background overflow-x-hidden">
       {/* Navigation */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <Network className="h-6 w-6 text-primary" />
             <span className="font-bold text-xl tracking-tight text-foreground">SourceMind</span>
           </div>
           <nav className="flex items-center gap-4">
+            <Link
+              to="/architecture"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Architecture
+            </Link>
             {isLoggedIn ? (
               <>
                 <Link
@@ -71,21 +78,21 @@ export function Home() {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Hero Section */}
         <section className="relative overflow-hidden py-24 lg:py-32">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background -z-10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/20 via-background to-background -z-10" />
           <div className="container mx-auto px-4 text-center">
             <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <Zap className="mr-2 h-4 w-4" /> Signals multi-source intelligence
             </div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-8 text-foreground animate-in fade-in slide-in-from-bottom-6 duration-700">
               Your Universal <br className="hidden sm:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-blue-600">
                 Knowledge Engine
               </span>
             </h1>
-            <p className="mx-auto max-w-[42rem] mb-10 text-muted-foreground sm:text-xl leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+            <p className="mx-auto max-w-2xl mb-10 text-muted-foreground sm:text-xl leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
               Unify your scattered intelligence. Connect websites, documents, videos, and codebases into a single semantic brain that answers your questions instantly.
             </p>
             <div className="flex flex-row flex-wrap justify-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-300">
@@ -137,9 +144,11 @@ export function Home() {
           </div>
         </section>
 
+        <TwoPaneProductDemo />
+
         {/* Value Prop Section */}
         <section className="py-24 border-b border-border/50 relative overflow-hidden">
-          <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-primary/5 to-transparent -z-10" />
+          <div className="absolute inset-x-0 bottom-0 top-1/2 bg-linear-to-t from-primary/5 to-transparent -z-10" />
           <div className="container mx-auto px-4">
             <div className="flex justify-center mb-12">
               <Shield className="w-16 h-16 text-primary opacity-80" />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Network, LayoutDashboard, FileText, MessageSquare, LogOut, Menu, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { Network, LayoutDashboard, FileText, MessageSquare, LogOut, Menu, X, ChevronRight, ChevronLeft, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLogout, getStoredUser } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export function Layout() {
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { label: "Sources", path: "/dashboard/sources", icon: FileText },
     { label: "AI Chat", path: "/dashboard/chat", icon: MessageSquare },
+    { label: "Architecture", path: "/architecture", icon: Workflow },
   ];
 
   const NavLink = ({ item }: { item: typeof navItems[0] }) => {
