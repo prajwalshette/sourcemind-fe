@@ -5,7 +5,10 @@ export interface QuerySource {
   excerpt: string;
   score: number;
   relevanceScore?: number;
+  sourceKind?: "document" | "web";
 }
+
+export type AnswerSourceType = "document" | "web";
 
 export interface QueryResult {
   answer: string;
@@ -17,6 +20,9 @@ export interface QueryResult {
   promptTokens: number;
   completionTokens: number;
   langsmithRunUrl?: string;
+  sourceType?: AnswerSourceType;
+  fallbackUsed?: boolean;
+  fallbackNotification?: string | null;
   intelligence?: {
     used: boolean;
     chunksBeforeFilter: number;
@@ -46,6 +52,8 @@ export interface QueryBody {
   skipAudit?: boolean;
   /** Skip Gemini query expansion (default: expand when backend has GEMINI_API_KEY) */
   skipQueryExpansion?: boolean;
+  /** Skip web search fallback when indexed documents are insufficient */
+  skipWebFallback?: boolean;
 }
 
 export interface QueryHistoryLog {
@@ -65,4 +73,18 @@ export interface Pagination {
   limit: number;
   total: number;
   pages: number;
+}
+
+export type QueryStreamStage =
+  | "understanding"
+  | "searching"
+  | "web_searching"
+  | "thinking"
+  | "writing"
+  | "done";
+
+export interface QueryStreamStatus {
+  stage: QueryStreamStage;
+  label: string;
+  detail?: string;
 }

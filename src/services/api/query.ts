@@ -6,6 +6,8 @@ import type {
   QueryHistoryLog,
   Pagination,
   QuerySource,
+  QueryStreamStatus,
+  AnswerSourceType,
 } from "@/types/query";
 
 export async function query(body: QueryBody): Promise<QueryResult> {
@@ -23,17 +25,22 @@ export type StreamMetaPayload = {
   sources: QuerySource[];
   intelligence: NonNullable<QueryResult["intelligence"]>;
   retrieval?: QueryResult["retrieval"];
+  sourceType?: AnswerSourceType;
+  fallbackUsed?: boolean;
+  fallbackNotification?: string | null;
 };
 
 /**
- * POST /query/stream — SSE: events `meta`, `token`, `done`, optional `error`.
+ * POST /query/stream — SSE: events `status`, `meta`, `token`, `done`, optional `error`.
  */
 export async function streamQuery(
   body: QueryBody,
   handlers: {
+    onStatus?: (data: QueryStreamStatus) => void;
     onMeta?: (data: StreamMetaPayload) => void;
     onToken?: (text: string) => void;
   } = {},
+  options: { signal?: AbortSignal } = {},
 ): Promise<QueryResult> {
   const token = localStorage.getItem("authToken");
   const res = await fetch(`${apiBaseURL}/query/stream`, {
@@ -43,6 +50,7 @@ export async function streamQuery(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
+    signal: options.signal,
   });
 
   if (res.status === 401) {
@@ -72,6 +80,10 @@ export async function streamQuery(
   let result: QueryResult | null = null;
 
   while (true) {
+    if (options.signal?.aborted) {
+      await reader.cancel().catch(() => undefined);
+      throw new DOMException("Aborted", "AbortError");
+    }
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
@@ -99,7 +111,9 @@ export async function streamQuery(
         continue;
       }
 
-      if (eventName === "meta") {
+      if (eventName === "status") {
+        handlers.onStatus?.(parsed as QueryStreamStatus);
+      } else if (eventName === "meta") {
         handlers.onMeta?.(parsed as StreamMetaPayload);
       } else if (eventName === "token") {
         const t = (parsed as { text?: string })?.text;

@@ -41,3 +41,10 @@ export async function deleteSession(id: string): Promise<void> {
   await serverInstance.delete(`/sessions/${id}`);
 }
 
+export async function truncateSession(
+  id: string,
+  fromTurnIndex: number,
+): Promise<void> {
+  await serverInstance.post(`/sessions/${id}/truncate`, { fromTurnIndex });
+}
+

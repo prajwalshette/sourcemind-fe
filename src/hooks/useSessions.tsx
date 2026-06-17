@@ -4,6 +4,7 @@ import {
   deleteSession as deleteSessionApi,
   getSessionThread as getSessionThreadApi,
   listSessions as listSessionsApi,
+  truncateSession as truncateSessionApi,
   updateSessionTitle as updateSessionTitleApi,
 } from "@/services/api/sessions";
 
@@ -59,6 +60,19 @@ export function useDeleteSession() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sessions"] });
+    },
+  });
+}
+
+export function useTruncateSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (opts: { sessionId: string; fromTurnIndex: number }) => {
+      await truncateSessionApi(opts.sessionId, opts.fromTurnIndex);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["sessionThread", vars.sessionId] });
     },
   });
 }

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteChatModal } from "@/components/chat/DeleteChatModal";
+import { ChatProcessIndicator } from "@/components/chat/ChatProcessIndicator";
 import { SourceSelectorDropdown } from "@/components/chat/SourceSelectorDropdown";
 import { Input } from "@/components/ui/input";
 import { streamQuery } from "@/services/api/query";
@@ -10,6 +11,7 @@ import {
   useDeleteSession,
   useSessionsList,
   useSessionThread,
+  useTruncateSession,
 } from "@/hooks/useSessions";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +19,8 @@ import {
   MessageSquare,
   Trash2,
   Send,
+  Square,
+  Pencil,
   Zap,
   Globe,
   FileText,
@@ -24,11 +28,22 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { QueryResult, QuerySource } from "@/types/query";
+import type { QueryResult, QuerySource, QueryStreamStage } from "@/types/query";
 import { cn } from "@/lib/utils";
 
 // Scope value: "" = all, "site:URL" = by site key, "doc:ID" = single document
 const SCOPE_ALL = "";
+
+type DisplayTurn = {
+  key: string;
+  turnIndex?: number;
+  question: string;
+  answer: string;
+  result: QueryResult | undefined;
+  scope: string | undefined;
+  isOptimistic: boolean;
+  currentStage?: QueryStreamStage;
+};
 
 export function Chat() {
   const [question, setQuestion] = useState("");
@@ -41,11 +56,15 @@ export function Chat() {
     result?: QueryResult;
     scope?: string;
     isError?: boolean;
+    currentStage?: QueryStreamStage;
   }>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
+  const [editFromTurnIndex, setEditFromTurnIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const qc = useQueryClient();
   const { data: sources = [] } = useSources();
@@ -54,6 +73,7 @@ export function Chat() {
   const threadQuery = useSessionThread(selectedSessionId);
   const createSessionMutation = useCreateSession();
   const deleteSessionMutation = useDeleteSession();
+  const truncateSessionMutation = useTruncateSession();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,44 +103,119 @@ export function Chat() {
     setActiveSessionId(session.id);
   }
 
+  function handleStop() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsStreaming(false);
+    const q = optimisticTurn?.question;
+    setOptimisticTurn(null);
+    if (q) setQuestion(q);
+  }
+
+  function handleEditTurn(turn: DisplayTurn) {
+    if (isStreaming) handleStop();
+    setQuestion(turn.question);
+    if (turn.scope) setScope(turn.scope);
+    if (turn.isOptimistic) {
+      setOptimisticTurn(null);
+      setEditFromTurnIndex(null);
+    } else if (turn.turnIndex != null) {
+      setEditFromTurnIndex(turn.turnIndex);
+    }
+    inputRef.current?.focus();
+  }
+
+  async function runQuery(q: string, sessionId: string) {
+    const { documentId, siteKey } = parseScope(scope);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const pushStatus = (status: { stage: QueryStreamStage }) => {
+      setOptimisticTurn((prev) =>
+        prev ? { ...prev, currentStage: status.stage } : prev,
+      );
+    };
+
+    const result = await streamQuery(
+      {
+        question: q,
+        documentId,
+        sessionId,
+        siteKey,
+        topK: 8,
+        useCache: true,
+        skipIntelligence: skipIntelligence || undefined,
+        useHybrid: true,
+      },
+      {
+        onStatus: pushStatus,
+        onToken: (text) => {
+          setOptimisticTurn((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              answer: (prev.answer ?? "") + text,
+              currentStage: "writing",
+            };
+          });
+        },
+        onMeta: (meta) => {
+          setOptimisticTurn((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              result: {
+                ...(prev.result ?? ({} as QueryResult)),
+                sources: meta.sources,
+                intelligence: meta.intelligence,
+                retrieval: meta.retrieval,
+                sourceType: meta.sourceType,
+                fallbackUsed: meta.fallbackUsed,
+                fallbackNotification: meta.fallbackNotification,
+              } as QueryResult,
+            };
+          });
+        },
+      },
+      { signal: controller.signal },
+    );
+
+    setOptimisticTurn({ question: q, answer: result.answer, result, scope });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["sessions"] }),
+      qc.invalidateQueries({ queryKey: ["sessionThread", sessionId] }),
+    ]);
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const q = question.trim();
-    if (!q) return;
+    if (!q || isStreaming) return;
     setQuestion("");
-    setOptimisticTurn({ question: q, answer: "", scope });
+    setOptimisticTurn({
+      question: q,
+      answer: "",
+      scope,
+      currentStage: "understanding",
+    });
     setIsStreaming(true);
 
     try {
       const sessionId = await ensureSession();
-      const { documentId, siteKey } = parseScope(scope);
 
-      const result = await streamQuery(
-        {
-          question: q,
-          documentId,
+      if (editFromTurnIndex != null) {
+        await truncateSessionMutation.mutateAsync({
           sessionId,
-          siteKey,
-          topK: 8,
-          useCache: true,
-          skipIntelligence: skipIntelligence || undefined,
-          useHybrid: true,
-        },
-        {
-          onToken: (text) => {
-            setOptimisticTurn((prev) => {
-              if (!prev) return prev;
-              return { ...prev, answer: (prev.answer ?? "") + text };
-            });
-          },
-        },
-      );
-      setOptimisticTurn({ question: q, answer: result.answer, result, scope });
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["sessions"] }),
-        qc.invalidateQueries({ queryKey: ["sessionThread", sessionId] }),
-      ]);
+          fromTurnIndex: editFromTurnIndex,
+        });
+        setEditFromTurnIndex(null);
+      }
+
+      await runQuery(q, sessionId);
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       const message =
         err instanceof Error
           ? err.message
@@ -136,6 +231,7 @@ export function Chat() {
         scope,
       });
     } finally {
+      abortRef.current = null;
       setIsStreaming(false);
     }
   };
@@ -171,10 +267,11 @@ export function Chat() {
     });
   }
 
-  const displayTurns = useMemo(() => {
+  const displayTurns = useMemo((): DisplayTurn[] => {
     const sessionTurns = threadQuery.data?.turns ?? [];
-    const base = sessionTurns.map((t) => ({
+    let base: DisplayTurn[] = sessionTurns.map((t) => ({
       key: `t-${t.turnIndex}`,
+      turnIndex: t.turnIndex,
       question: t.question,
       answer: t.answer,
       result: (t as any).result as QueryResult | undefined,
@@ -182,21 +279,26 @@ export function Chat() {
       isOptimistic: false,
     }));
 
+    if (editFromTurnIndex != null) {
+      base = base.filter((t) => (t.turnIndex ?? 0) < editFromTurnIndex);
+    }
+
     if (optimisticTurn?.question) {
       const already = sessionTurns.some((t) => t.question === optimisticTurn.question && !!t.answer);
       if (!already) {
         base.push({
           key: "optimistic",
           question: optimisticTurn.question,
-          answer: optimisticTurn.answer && optimisticTurn.answer.length > 0 ? optimisticTurn.answer : "…",
+          answer: optimisticTurn.answer ?? "",
           result: optimisticTurn.result,
           scope: optimisticTurn.scope,
           isOptimistic: true,
+          currentStage: optimisticTurn.currentStage,
         });
       }
     }
     return base;
-  }, [optimisticTurn, threadQuery.data]);
+  }, [optimisticTurn, threadQuery.data, editFromTurnIndex]);
 
   function openDeleteSessionModal(id: string) {
     setDeleteSessionId(id);
@@ -242,6 +344,7 @@ export function Chat() {
                 key={s.id}
                 onClick={() => {
                   setOptimisticTurn(null);
+                  setEditFromTurnIndex(null);
                   setActiveSessionId(s.id);
                 }}
                 className={cn(
@@ -283,7 +386,11 @@ export function Chat() {
                   {threadQuery.data?.session?.title || "AI Assistant"}
                 </h3>
                 <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" /> Streaming enabled
+                  <span className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    isStreaming ? "bg-green-500 animate-pulse" : "bg-muted-foreground/50"
+                  )} />
+                  {isStreaming ? "Processing your question..." : "Streaming enabled"}
                 </p>
               </div>
             </div>
@@ -345,11 +452,19 @@ export function Chat() {
               <div key={t.key} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 {/* User Message */}
                 <div className="flex justify-end pr-2 lg:pr-12">
-                  <div className="relative group">
-                    <div className="rounded-2xl rounded-tr-none bg-primary text-primary-foreground px-4 py-3 shadow-lg shadow-primary/10 max-w-xl text-sm leading-relaxed relative z-10">
+                  <div className="relative group max-w-xl">
+                    <div className="rounded-2xl rounded-tr-none bg-primary text-primary-foreground px-4 py-3 shadow-lg shadow-primary/10 text-sm leading-relaxed relative z-10">
                       {t.question}
                     </div>
-                    <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-opacity" />
+                    <button
+                      type="button"
+                      onClick={() => handleEditTurn(t)}
+                      className="absolute -left-9 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+                      title="Edit message"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-opacity -z-10" />
                   </div>
                 </div>
 
@@ -361,9 +476,20 @@ export function Chat() {
                   <div className="flex-1 space-y-3">
                     <div className={cn(
                       "rounded-2xl rounded-tl-none px-5 py-4 text-sm leading-7 shadow-sm border border-border/40 backdrop-blur-sm",
-                      t.isOptimistic && !t.answer ? "bg-muted/30 italic text-muted-foreground" : "bg-card/50"
+                      t.isOptimistic && !t.answer ? "bg-muted/30" : "bg-card/50"
                     )}>
-                      <MarkdownText content={t.answer} />
+                      {t.isOptimistic && isStreaming && !t.answer ? (
+                        <ChatProcessIndicator currentStage={t.currentStage} />
+                      ) : (
+                        <>
+                          {t.result?.fallbackUsed && t.result.fallbackNotification && (
+                            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-100/90">
+                              {t.result.fallbackNotification}
+                            </div>
+                          )}
+                          <MarkdownText content={t.answer || "…"} />
+                        </>
+                      )}
 
                       {/* Sources Section */}
                       {t.result && t.result.sources?.length > 0 && (() => {
@@ -373,7 +499,9 @@ export function Chat() {
                         return (
                           <div className="mt-6 pt-4 border-t border-border/50">
                             <div className="flex items-center justify-between mb-3">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sources Cited</p>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {t.result.sourceType === "web" ? "Web Sources" : "Sources Cited"}
+                              </p>
                               {ordered.length > 2 && (
                                 <button 
                                   onClick={() => toggleSourcesExpanded(idx)}
@@ -417,8 +545,17 @@ export function Chat() {
                     {t.result && (
                       <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-medium px-1">
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {t.result.latencyMs}ms</span>
+                        {t.result.confidence != null && (
+                          <span className="flex items-center gap-1 border-l border-border/50 pl-2">
+                            Confidence: {Math.round(t.result.confidence * 100)}%
+                          </span>
+                        )}
                         <span className="flex items-center gap-1 border-l border-border/50 pl-2">
-                           {t.result.intelligence?.used ? "Intelligence: High" : "Intelligence: Fast"}
+                           {t.result.sourceType === "web"
+                             ? "Source: Web"
+                             : t.result.intelligence?.used
+                               ? "Intelligence: High"
+                               : "Intelligence: Fast"}
                         </span>
                         {t.result.fromCache && <span>· Cache HIT</span>}
                       </div>
@@ -444,27 +581,39 @@ export function Chat() {
                 style={{ borderRadius: "100px" }}
                >
                   <Input
-                    placeholder={selectedSessionId ? "Type your question..." : "Create a session to begin..."}
+                    ref={inputRef}
+                    placeholder={
+                      editFromTurnIndex != null
+                        ? "Edit your question and resend..."
+                        : selectedSessionId
+                          ? "Type your question..."
+                          : "Create a session to begin..."
+                    }
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     className="flex-1 bg-transparent border-none focus-visible:ring-0 shadow-none text-sm h-12"
                     disabled={isStreaming}
                   />
-                  <Button 
-                    type="submit" 
-                    size="icon"
-                    disabled={isStreaming || !question.trim()}
-                    className={cn(
-                      "h-10 w-10 min-w-10 rounded-full transition-transform",
-                      isStreaming ? "animate-pulse" : "hover:scale-105 active:scale-95"
-                    )}
-                  >
-                    {isStreaming ? (
-                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
+                  {isStreaming ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      onClick={handleStop}
+                      className="h-10 w-10 min-w-10 rounded-full bg-destructive hover:bg-destructive/90 transition-transform hover:scale-105 active:scale-95"
+                      title="Stop generating"
+                    >
+                      <Square className="h-3.5 w-3.5 fill-current" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={!question.trim()}
+                      className="h-10 w-10 min-w-10 rounded-full transition-transform hover:scale-105 active:scale-95"
+                    >
                       <Send className="h-4 w-4" />
-                    )}
-                  </Button>
+                    </Button>
+                  )}
                </form>
                <p className="mt-2 text-[10px] text-center text-muted-foreground font-medium">
                   SourceMind AI may provide inaccurate info about people, places, or facts. Verified with RAG confidence.
